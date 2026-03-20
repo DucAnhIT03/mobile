@@ -1,0 +1,5 @@
+{
+  "name": "ConnectDucAnh",
+  "description": "A social media application with feed, profile, messaging, and video calls.",
+  "requestFramePermissions": ["camera", "microphone"]
+}

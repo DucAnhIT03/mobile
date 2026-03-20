@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --animate-marquee: marquee 5s linear infinite;
+  --animate-spin-slow: spin 4s linear infinite;
+  
+  @keyframes marquee {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    /* IE and Edge */
+    -ms-overflow-style: none;
+    /* Firefox */
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .marquee {
+    display: inline-block;
+    white-space: nowrap;
+    animation: marquee 5s linear infinite;
+  }
+}
