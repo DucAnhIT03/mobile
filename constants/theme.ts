@@ -1,0 +1,31 @@
+export const Colors = {
+  background: '#000000',
+  surface: '#121212',
+  surfaceLight: '#1A1A1A',
+  surfaceMid: '#262626',
+  surfaceHigh: '#2A2A2A',
+  surfaceBorder: 'rgba(255,255,255,0.1)',
+  white: '#FFFFFF',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#9CA3AF',
+  textTertiary: '#6B7280',
+  accent: '#3B82F6',
+  accentLight: '#60A5FA',
+  pink: '#EC4899',
+  purple: '#7E22CE',
+  orange: '#F97316',
+  red: '#EF4444',
+  green: '#22C55E',
+  gradientStart: '#7e22ce',
+  gradientMid: '#ec4899',
+  gradientEnd: '#f97316',
+};
+
+export const Fonts = {
+  regular: { fontSize: 14, color: Colors.textPrimary },
+  semibold: { fontSize: 14, fontWeight: '600' as const, color: Colors.textPrimary },
+  bold: { fontSize: 14, fontWeight: '700' as const, color: Colors.textPrimary },
+  title: { fontSize: 17, fontWeight: '600' as const, color: Colors.textPrimary },
+  heading: { fontSize: 24, fontWeight: '700' as const, color: Colors.textPrimary },
+  caption: { fontSize: 12, color: Colors.textSecondary },
+};

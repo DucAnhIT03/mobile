@@ -29,15 +29,15 @@ export default function MobileLayout() {
           <span className="text-[15px] font-semibold tracking-tight text-white drop-shadow-md">9:41</span>
           <div className="flex items-center gap-1.5 drop-shadow-md">
             <svg width="18" height="12" viewBox="0 0 18 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M1 9.5H3V11.5H1V9.5ZM5 7.5H7V11.5H5V7.5ZM9 5.5H11V11.5H9V5.5ZM13 3.5H15V11.5H13V3.5ZM17 1.5H19V11.5H17V1.5Z" fill="white"/>
+              <path d="M1 9.5H3V11.5H1V9.5ZM5 7.5H7V11.5H5V7.5ZM9 5.5H11V11.5H9V5.5ZM13 3.5H15V11.5H13V3.5ZM17 1.5H19V11.5H17V1.5Z" fill="white" />
             </svg>
             <svg width="16" height="12" viewBox="0 0 16 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M8 0C4.8 0 1.8 1.4 0 3.6L8 12L16 3.6C14.2 1.4 11.2 0 8 0Z" fill="white"/>
+              <path d="M8 0C4.8 0 1.8 1.4 0 3.6L8 12L16 3.6C14.2 1.4 11.2 0 8 0Z" fill="white" />
             </svg>
             <svg width="25" height="12" viewBox="0 0 25 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white"/>
-              <rect x="2" y="2" width="18" height="8" rx="2" fill="white"/>
-              <path d="M23 4V8" stroke="white" strokeLinecap="round"/>
+              <rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" />
+              <rect x="2" y="2" width="18" height="8" rx="2" fill="white" />
+              <path d="M23 4V8" stroke="white" strokeLinecap="round" />
             </svg>
           </div>
         </div>
@@ -67,7 +67,7 @@ export default function MobileLayout() {
             })}
           </div>
         )}
-        
+
         {/* Home Indicator Mock */}
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[134px] h-[5px] bg-white rounded-full z-50 pointer-events-none opacity-80" />
       </div>
