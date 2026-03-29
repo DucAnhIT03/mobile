@@ -23,8 +23,20 @@ export default function ActivityHistoryScreen({ navigation }: any) {
     { id: 'links-visited', icon: LinkIcon, label: 'Liên kết bạn đã truy cập', description: 'Xem các liên kết bạn đã truy cập gần đây.' },
   ];
 
+  const navigateMap: Record<string, string> = {
+    'likes': 'LikesHistory',
+    'comments': 'CommentsHistory',
+  };
+
   const renderItem = (item: any) => (
-    <TouchableOpacity key={item.id} style={styles.listItem}>
+    <TouchableOpacity
+      key={item.id}
+      style={styles.listItem}
+      onPress={() => {
+        const screen = navigateMap[item.id];
+        if (screen) navigation.navigate(screen);
+      }}
+    >
       <View style={styles.listItemLeft}>
         <View style={styles.iconCircle}><item.icon size={24} color="#fff" /></View>
         <View style={styles.listItemText}><Text style={styles.itemLabel}>{item.label}</Text><Text style={styles.itemDesc}>{item.description}</Text></View>

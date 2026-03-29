@@ -6,6 +6,8 @@ import { UserModule } from './modules/user/user.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { PostModule } from './modules/post/post.module';
 import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
+import { RecommendationModule } from './modules/recommendation/recommendation.module';
+import { StoryModule } from './modules/story/story.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
     ChatModule,
     PostModule,
     CloudinaryModule,
+    RecommendationModule,
+    StoryModule,
   ],
 })
 export class AppModule {}

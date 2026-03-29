@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { showAlert } from '../utils/alert';
 import { BASE_URL } from '../services/api';
 import { postApi, PostItem } from '../api/postApi';
+import VideoThumbnailItem from '../components/VideoThumbnailItem';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 type TabType = 'posts' | 'reels' | 'tagged';
@@ -133,16 +134,22 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         }
         renderItem={({ item }: { item: PostItem }) => {
-          const imageUri = item.type === 'video' && item.thumbnail
-            ? (item.thumbnail.startsWith('http') ? item.thumbnail : `${BASE_URL}${item.thumbnail}`)
-            : item.media[0]?.startsWith('http') ? item.media[0] : `${BASE_URL}${item.media[0]}`;
+          const resolveMediaUri = (uri: string) => uri?.startsWith('http') ? uri : `${BASE_URL}${uri}`;
           return (
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => navigation.navigate('PostDetail', { post: item })}
               style={[styles.gridItem, { width: ITEM_SIZE, height: ITEM_SIZE }]}
             >
-              <Image source={{ uri: imageUri }} style={styles.gridImage} />
+              {item.type === 'video' ? (
+                <VideoThumbnailItem
+                  videoUri={resolveMediaUri(item.media[0])}
+                  thumbnailUri={item.thumbnail ? resolveMediaUri(item.thumbnail) : null}
+                  style={styles.gridImage}
+                />
+              ) : (
+                <Image source={{ uri: resolveMediaUri(item.media[0]) }} style={styles.gridImage} />
+              )}
               {item.type === 'video' && (
                 <View style={styles.videoOverlay}>
                   <Play size={24} color="#fff" fill="#fff" />

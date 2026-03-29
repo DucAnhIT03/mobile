@@ -3,16 +3,19 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-// Tự động chọn IP theo platform
-// - Web: localhost
-// - Android Emulator: 10.0.2.2
-// - Thiết bị thật (QR): IP WiFi máy tính
+// Tự động lấy IP từ Expo dev server — không cần đổi tay nữa!
 const getBaseUrl = () => {
   if (Platform.OS === 'web') {
     return 'http://localhost:3000';
   }
-  // Thiết bị thật qua Expo Go (QR code) → dùng IP WiFi máy tính
-  return 'http://192.168.1.178:3000';
+  // Lấy IP từ Expo hostUri (e.g. "192.168.1.169:8081")
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const ip = hostUri.split(':')[0]; // Tách IP bỏ port
+    return `http://${ip}:3000`;
+  }
+  // Fallback
+  return 'http://192.168.1.169:3000';
 };
 
 const BASE_URL = getBaseUrl();

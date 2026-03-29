@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Post } from './post.entity';
 import { Like } from './like.entity';
 import { Comment } from './comment.entity';
+import { RecommendationService } from '../recommendation/recommendation.service';
 
 @Injectable()
 export class PostService {
@@ -17,7 +18,8 @@ export class PostService {
   ) {}
 
   async create(userId: number, data: { caption: string; type: 'image' | 'video'; media: string[]; thumbnail?: string }): Promise<Post> {
-    const post = this.postRepo.create({ userId, ...data });
+    const tags = RecommendationService.extractTags(data.caption);
+    const post = this.postRepo.create({ userId, ...data, tags });
     return this.postRepo.save(post);
   }
 
@@ -55,12 +57,14 @@ export class PostService {
 
   /** Tạo bài viết từ URL (không upload file) */
   async createFromUrl(userId: number, data: { caption: string; type: 'image' | 'video'; mediaUrls: string[]; thumbnail?: string }): Promise<Post> {
+    const tags = RecommendationService.extractTags(data.caption);
     const post = this.postRepo.create({
       userId,
       caption: data.caption,
       type: data.type,
       media: data.mediaUrls,
       thumbnail: data.thumbnail,
+      tags,
     });
     return this.postRepo.save(post);
   }
@@ -152,5 +156,61 @@ export class PostService {
     await this.commentRepo.delete(commentId);
     await this.postRepo.decrement({ id: comment.postId }, 'commentsCount', 1);
     return true;
+  }
+
+  // =================== ACTIVITY HISTORY ===================
+
+  /** Lấy danh sách bài viết user đã like */
+  async getUserLikes(userId: number, page = 1, limit = 30): Promise<{ items: any[]; total: number }> {
+    const [likes, total] = await this.likeRepo.findAndCount({
+      where: { userId },
+      relations: ['post', 'post.user'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const items = likes.map(like => {
+      if (like.post?.user) delete (like.post.user as any).passwordHash;
+      return {
+        likeId: like.id,
+        likedAt: like.createdAt,
+        post: like.post,
+      };
+    });
+
+    return { items, total };
+  }
+
+  /** Bỏ like (unlike) theo likeId */
+  async unlikeByLikeId(userId: number, likeId: number): Promise<boolean> {
+    const like = await this.likeRepo.findOne({ where: { id: likeId } });
+    if (!like || like.userId !== userId) return false;
+    await this.likeRepo.delete(likeId);
+    await this.postRepo.decrement({ id: like.postId }, 'likesCount', 1);
+    return true;
+  }
+
+  /** Lấy danh sách comment của user */
+  async getUserComments(userId: number, page = 1, limit = 30): Promise<{ items: any[]; total: number }> {
+    const [comments, total] = await this.commentRepo.findAndCount({
+      where: { userId },
+      relations: ['post', 'post.user'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const items = comments.map(c => {
+      if (c.post?.user) delete (c.post.user as any).passwordHash;
+      return {
+        commentId: c.id,
+        content: c.content,
+        commentedAt: c.createdAt,
+        post: c.post,
+      };
+    });
+
+    return { items, total };
   }
 }

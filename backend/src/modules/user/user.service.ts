@@ -14,7 +14,7 @@ export class UserService {
     private readonly followRepo: Repository<UserFollow>,
     @InjectRepository(Post)
     private readonly postRepo: Repository<Post>,
-  ) {}
+  ) { }
 
   async findById(id: number): Promise<User | null> {
     return this.userRepo.findOne({ where: { id } });
@@ -90,7 +90,7 @@ export class UserService {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) return null;
 
-    // Auto-migrate: nếu username không phải dạng ID (chứa unicode/spaces) → tự tạo ID
+
     if (!this.isValidIdUsername(user.username)) {
       const oldName = user.username;
       const newUsername = await this.generateUsername(oldName);

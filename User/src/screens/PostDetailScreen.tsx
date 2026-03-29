@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { BASE_URL } from '../services/api';
 import { CommentsModal } from '../components/CommentsModal';
 import { postApi } from '../api/postApi';
-import { Video, ResizeMode } from 'expo-av';
+import VideoPlayerItem from '../components/VideoPlayerItem';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -102,13 +102,13 @@ export default function PostDetailScreen({ navigation, route }: any) {
         {/* Post Media */}
         {post.media && post.media.length > 0 && (
           post.type === 'video' ? (
-            <Video
-              source={{ uri: resolveUri(post.media[0]) }}
+            <VideoPlayerItem
+              uri={resolveUri(post.media[0])}
               style={styles.postImage}
-              resizeMode={ResizeMode.CONTAIN}
               shouldPlay={true}
-              isLooping
-              useNativeControls
+              isLooping={true}
+              contentFit="contain"
+              nativeControls={true}
             />
           ) : (
             <ScrollView

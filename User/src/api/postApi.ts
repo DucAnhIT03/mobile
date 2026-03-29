@@ -112,4 +112,22 @@ export const postApi = {
   /** Xóa bình luận */
   deleteComment: (commentId: number) =>
     api.delete<{ message: string }>(`/posts/comments/${commentId}`),
+
+  // =================== RECOMMENDATION ===================
+
+  /** Ghi nhận tương tác video (watch time, skip, replay, ...) */
+  trackInteraction: (data: {
+    postId: number;
+    action: 'view' | 'like' | 'comment' | 'share' | 'skip' | 'replay';
+    watchTimeMs?: number;
+    videoDurationMs?: number;
+  }) => api.post('/recommendation/interaction', data),
+
+  /** Lấy feed đề xuất video (FYP) */
+  getRecommendedFeed: (page = 1, limit = 10) =>
+    api.get<PostsResponse>('/recommendation/feed', { params: { page, limit } }),
+
+  /** Lấy hồ sơ sở thích user */
+  getUserInterests: () =>
+    api.get<Record<string, number>>('/recommendation/interests'),
 };

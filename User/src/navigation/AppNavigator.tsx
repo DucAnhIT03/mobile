@@ -28,6 +28,9 @@ import UserSearchScreen from '../screens/UserSearchScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
 import ChatInfoScreen from '../screens/ChatInfoScreen';
 import PostDetailScreen from '../screens/PostDetailScreen';
+import CreateStoryScreen from '../screens/CreateStoryScreen';
+import LikesHistoryScreen from '../screens/LikesHistoryScreen';
+import CommentsHistoryScreen from '../screens/CommentsHistoryScreen';
 import IncomingCallModal from '../components/IncomingCallModal';
 
 export type RootStackParamList = {
@@ -42,13 +45,16 @@ export type RootStackParamList = {
   Connections: { tab?: string };
   ActivityHistory: undefined;
   Settings: undefined;
-  StoryViewer: { id: string };
+  StoryViewer: { userId: number };
   AIChat: undefined;
   OtpVerify: { email: string };
   UserSearch: undefined;
   UserProfile: { userId: number; username: string; avatar: string; isOnline: boolean; email?: string };
   ChatInfo: { name: string; avatar: string; isOnline: boolean; targetUserId: number };
   PostDetail: { post: any };
+  CreateStory: undefined;
+  LikesHistory: undefined;
+  CommentsHistory: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -155,6 +161,9 @@ export default function AppNavigator() {
         <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ animation: 'none' }} />
         <Stack.Screen name="ChatInfo" component={ChatInfoScreen} options={{ animation: 'none' }} />
         <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ animation: 'none' }} />
+        <Stack.Screen name="CreateStory" component={CreateStoryScreen} options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="LikesHistory" component={LikesHistoryScreen} options={{ animation: 'none' }} />
+        <Stack.Screen name="CommentsHistory" component={CommentsHistoryScreen} options={{ animation: 'none' }} />
       </Stack.Navigator>
       <IncomingCallModal />
     </NavigationContainer>

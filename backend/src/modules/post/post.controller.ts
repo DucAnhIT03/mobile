@@ -144,4 +144,28 @@ export class PostController {
     }
     return { message: 'Đã xóa bình luận' };
   }
+
+  // =================== ACTIVITY HISTORY ===================
+
+  /** Lấy lịch sử like của user hiện tại */
+  @Get('activity/my-likes')
+  async getMyLikes(@Req() req: any, @Query('page') page: string) {
+    return this.postService.getUserLikes(req.user.userId, parseInt(page) || 1);
+  }
+
+  /** Bỏ like theo likeId */
+  @Delete('activity/my-likes/:likeId')
+  async unlikeByLikeId(@Param('likeId') likeId: string, @Req() req: any) {
+    const result = await this.postService.unlikeByLikeId(req.user.userId, +likeId);
+    if (!result) {
+      throw new NotFoundException('Không tìm thấy lượt thích');
+    }
+    return { message: 'Đã bỏ thích' };
+  }
+
+  /** Lấy lịch sử comment của user hiện tại */
+  @Get('activity/my-comments')
+  async getMyComments(@Req() req: any, @Query('page') page: string) {
+    return this.postService.getUserComments(req.user.userId, parseInt(page) || 1);
+  }
 }

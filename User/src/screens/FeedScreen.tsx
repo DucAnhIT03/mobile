@@ -7,24 +7,27 @@ import { CommentsModal } from '../components/CommentsModal';
 import { NotificationsModal } from '../components/NotificationsModal';
 import { LinearGradient } from 'expo-linear-gradient';
 import { postApi, PostItem } from '../api/postApi';
+import { storyApi, StoryUser } from '../api/storyApi';
 import { BASE_URL } from '../services/api';
-import { Video, ResizeMode } from 'expo-av';
+import VideoPlayerItem from '../components/VideoPlayerItem';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-const stories = [
-  { id: 1, user: 'Your Story', image: 'https://i.pravatar.cc/150?img=11', isUser: true, hasStory: false },
-  { id: 2, user: 'alex_chen', image: 'https://i.pravatar.cc/150?img=12', hasStory: true },
-  { id: 3, user: 'sarah.j', image: 'https://i.pravatar.cc/150?img=32', hasStory: true },
-  { id: 4, user: 'mike.travels', image: 'https://i.pravatar.cc/150?img=47', hasStory: true },
-  { id: 5, user: 'emma_w', image: 'https://i.pravatar.cc/150?img=5', hasStory: true },
-  { id: 6, user: 'david.dev', image: 'https://i.pravatar.cc/150?img=8', hasStory: true },
-];
 
 interface FeedPost extends PostItem {
   isLiked: boolean;
   isSaved: boolean;
 }
+
+interface StoryCircle {
+  id: number;
+  user: string;
+  image: string;
+  isUser: boolean;
+  hasStory: boolean;
+  userId: number;
+}
+
 
 export default function FeedScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -36,9 +39,40 @@ export default function FeedScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [visiblePostIds, setVisiblePostIds] = useState<number[]>([]);
+  const [storyCircles, setStoryCircles] = useState<StoryCircle[]>([]);
+  const [currentUserAvatar, setCurrentUserAvatar] = useState('https://i.pravatar.cc/150');
+
+  // Watch time tracking per video post
+  const videoWatchStart = useRef<Record<number, number>>({});
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     const ids = viewableItems.map((v: any) => v.item?.id).filter(Boolean);
+    const newVisible = new Set(ids);
+    const prevVisible = Object.keys(videoWatchStart.current).map(Number);
+
+    // Send interaction for videos that scrolled out of view
+    for (const id of prevVisible) {
+      if (!newVisible.has(id)) {
+        const watchTimeMs = Date.now() - (videoWatchStart.current[id] || Date.now());
+        delete videoWatchStart.current[id];
+        if (watchTimeMs > 500) {
+          postApi.trackInteraction({
+            postId: id,
+            action: watchTimeMs < 2000 ? 'skip' : 'view',
+            watchTimeMs,
+            videoDurationMs: 30000,
+          }).catch(() => {});
+        }
+      }
+    }
+
+    // Start tracking newly visible video posts
+    for (const id of ids) {
+      if (!videoWatchStart.current[id]) {
+        videoWatchStart.current[id] = Date.now();
+      }
+    }
+
     setVisiblePostIds(ids);
   }).current;
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
@@ -73,19 +107,88 @@ export default function FeedScreen({ navigation }: any) {
     }
   };
 
+  const loadStories = async () => {
+    try {
+      // Lấy avatar current user
+      const userStr = await AsyncStorage.getItem('user');
+      let myAvatar = 'https://i.pravatar.cc/150';
+      let myId = 0;
+      if (userStr) {
+        const me = JSON.parse(userStr);
+        myAvatar = me.avatar || myAvatar;
+        myId = me.id || 0;
+        setCurrentUserAvatar(myAvatar);
+      }
+
+      const res = await storyApi.getStories();
+      const users = res.data.users || [];
+
+      // Tạo danh sách circle
+      const circles: StoryCircle[] = [];
+
+      // "Your Story" — nút thêm story, LUÔN hiện ở đầu
+      circles.push({
+        id: -1,
+        user: 'Your Story',
+        image: myAvatar,
+        isUser: true,
+        hasStory: false,
+        userId: myId,
+      });
+
+      // Nếu user đã có story → thêm circle riêng để xem story của mình
+      const myStories = users.find(u => u.userId === myId);
+      if (myStories && myStories.stories.length > 0) {
+        // Dùng ảnh media của story đầu tiên làm thumbnail
+        const firstStoryMedia = myStories.stories[0]?.mediaUrl;
+        circles.push({
+          id: myId,
+          user: 'Story của bạn',
+          image: firstStoryMedia ? resolveUri(firstStoryMedia) : myAvatar,
+          isUser: false,
+          hasStory: true,
+          userId: myId,
+        });
+      }
+
+      // Các user khác — dùng ảnh media story đầu tiên làm thumbnail
+      for (const u of users) {
+        if (u.userId === myId) continue;
+        const firstMedia = u.stories[0]?.mediaUrl;
+        circles.push({
+          id: u.userId,
+          user: u.displayName || u.username,
+          image: firstMedia ? resolveUri(firstMedia) : (u.avatar ? resolveUri(u.avatar) : 'https://i.pravatar.cc/150'),
+          isUser: false,
+          hasStory: u.hasUnviewed,
+          userId: u.userId,
+        });
+      }
+
+      setStoryCircles(circles);
+    } catch {
+      // Fallback: chỉ hiện "Your Story"
+      setStoryCircles([{ id: -1, user: 'Your Story', image: 'https://i.pravatar.cc/150', isUser: true, hasStory: false, userId: 0 }]);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadFeed();
+      loadStories();
     }, [])
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadFeed();
+    await Promise.all([loadFeed(), loadStories()]);
     setRefreshing(false);
   };
 
   const toggleLike = async (postId: number) => {
+    // Track like interaction for recommendation
+    postApi.trackInteraction({ postId, action: 'like' }).catch(() => {});
+
     // Optimistic update
     setPosts(prev =>
       prev.map(post =>
@@ -133,10 +236,17 @@ export default function FeedScreen({ navigation }: any) {
     return date.toLocaleDateString('vi-VN').toUpperCase();
   };
 
-  const renderStory = ({ item: story }: any) => (
+  const renderStory = ({ item: story }: { item: StoryCircle }) => (
     <TouchableOpacity
       style={styles.storyItem}
-      onPress={() => story.isUser ? navigation.navigate('Create') : navigation.navigate('StoryViewer', { id: story.id.toString() })}
+      onPress={() => {
+        if (story.isUser) {
+          // Nút "Your Story" → luôn mở tạo story mới
+          navigation.navigate('CreateStory');
+        } else {
+          navigation.navigate('StoryViewer', { userId: story.userId });
+        }
+      }}
     >
       {story.hasStory ? (
         <LinearGradient colors={['#fbbf24', '#ef4444', '#d946ef']} style={styles.storyRing} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
@@ -187,20 +297,16 @@ export default function FeedScreen({ navigation }: any) {
         {/* Post Media */}
         {post.type === 'video' ? (
           <View style={{ position: 'relative', backgroundColor: '#000' }}>
-            <Video
-              source={{ uri: postImage }}
+            <VideoPlayerItem
+              uri={postImage}
               style={styles.postImage}
-              resizeMode={ResizeMode.CONTAIN}
               shouldPlay={isFocused && visiblePostIds.includes(post.id)}
-              isLooping
               isMuted={isMuted || !isFocused || !visiblePostIds.includes(post.id)}
+              isLooping={true}
+              contentFit="contain"
+              nativeControls={false}
+              onMuteToggle={() => setIsMuted(!isMuted)}
             />
-            <TouchableOpacity
-              style={styles.muteBtn}
-              onPress={() => setIsMuted(!isMuted)}
-            >
-              {isMuted ? <VolumeX size={18} color="#fff" /> : <Volume2 size={18} color="#fff" />}
-            </TouchableOpacity>
           </View>
         ) : (
           <Image source={{ uri: postImage }} style={styles.postImage} />
@@ -266,10 +372,10 @@ export default function FeedScreen({ navigation }: any) {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <FlatList
-              data={stories}
+              data={storyCircles}
               horizontal
               showsHorizontalScrollIndicator={false}
-              keyExtractor={item => item.id.toString()}
+              keyExtractor={item => `story-${item.id}`}
               contentContainerStyle={styles.storiesList}
               renderItem={renderStory}
               style={styles.storiesContainer}
