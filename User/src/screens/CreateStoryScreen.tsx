@@ -99,7 +99,7 @@ export default function CreateStoryScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
             <Image source={{ uri: mediaUri }} style={styles.previewImage} resizeMode="cover" />
 

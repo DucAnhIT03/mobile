@@ -2,10 +2,11 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, Pressable, StyleSheet, FlatList, Dimensions, ViewToken, useWindowDimensions, Animated, ActivityIndicator, RefreshControl } from 'react-native';
 import { Heart, MessageCircle, Share2, Music, MoreHorizontal, Plus, Volume2, VolumeX, Play } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useIsFocused, useFocusEffect } from '@react-navigation/native';
+import { useIsFocused, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { CommentsModal } from '../components/CommentsModal';
 import VideoPlayerItem from '../components/VideoPlayerItem';
 import { postApi, PostItem } from '../api/postApi';
+import { userApi } from '../api/userApi';
 import { BASE_URL } from '../services/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -18,6 +19,7 @@ export default function ReelsScreen() {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const isFocused = useIsFocused();
+  const navigation = useNavigation<any>();
   const [reels, setReels] = useState<ReelItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeReelIndex, setActiveReelIndex] = useState(0);
@@ -27,6 +29,7 @@ export default function ReelsScreen() {
   const [isPaused, setIsPaused] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showHeart, setShowHeart] = useState(false);
+  const [followedUsers, setFollowedUsers] = useState<Set<number>>(new Set());
   const pauseIconOpacity = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(0)).current;
   const lastTap = useRef<number>(0);
@@ -278,8 +281,42 @@ export default function ReelsScreen() {
         {/* Right Actions */}
         <View style={styles.rightActions} pointerEvents="box-none">
           <View style={styles.reelAvatarContainer}>
-            <Image source={{ uri: userAvatar }} style={styles.reelAvatar} />
-            <View style={styles.followBadge}><Plus size={12} color="#fff" /></View>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                if (reel.user) {
+                  navigation.navigate('UserProfile', {
+                    userId: reel.user.id,
+                    username: reel.user.username,
+                    avatar: reel.user.avatar,
+                    isOnline: false,
+                  });
+                }
+              }}
+            >
+              <Image source={{ uri: userAvatar }} style={styles.reelAvatar} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.followBadge, followedUsers.has(reel.user?.id || 0) && styles.followedBadge]}
+              onPress={async () => {
+                if (!reel.user) return;
+                const uid = reel.user.id;
+                try {
+                  if (followedUsers.has(uid)) {
+                    await userApi.unfollow(uid);
+                    setFollowedUsers(prev => { const s = new Set(prev); s.delete(uid); return s; });
+                  } else {
+                    await userApi.follow(uid);
+                    setFollowedUsers(prev => new Set(prev).add(uid));
+                  }
+                } catch {}
+              }}
+            >
+              {followedUsers.has(reel.user?.id || 0)
+                ? <Text style={styles.followedText}>✓</Text>
+                : <Plus size={12} color="#fff" />
+              }
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity onPress={() => toggleLike(reel.id)} style={styles.actionBtn}>
@@ -414,5 +451,13 @@ const styles = StyleSheet.create({
   pauseIconBg: {
     backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 40,
     padding: 16,
+  },
+  followedBadge: {
+    backgroundColor: '#22c55e',
+  },
+  followedText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });

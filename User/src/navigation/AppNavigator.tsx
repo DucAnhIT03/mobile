@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Home, Search, Clapperboard, MessageCircle, User } from 'lucide-react-native';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,17 +58,14 @@ export type RootStackParamList = {
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createMaterialTopTabNavigator();
+const Tab = createBottomTabNavigator();
 
 function MainTabs() {
   const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
-      tabBarPosition="bottom"
       screenOptions={{
-        swipeEnabled: true,
-        animationEnabled: true,
-        sceneStyle: { backgroundColor: '#000' },
+        headerShown: false,
         tabBarStyle: {
           backgroundColor: '#1a1a1a',
           borderTopColor: 'rgba(255,255,255,0.1)',
@@ -80,7 +77,6 @@ function MainTabs() {
         tabBarActiveTintColor: '#ffffff',
         tabBarInactiveTintColor: '#6b7280',
         tabBarShowLabel: false,
-        tabBarIndicatorStyle: { backgroundColor: 'transparent' },
       }}
     >
       <Tab.Screen

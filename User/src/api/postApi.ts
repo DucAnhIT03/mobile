@@ -130,4 +130,18 @@ export const postApi = {
   /** Lấy hồ sơ sở thích user */
   getUserInterests: () =>
     api.get<Record<string, number>>('/recommendation/interests'),
+
+  // =================== BOOKMARK ===================
+
+  /** Toggle lưu bài viết */
+  toggleBookmark: (postId: number) =>
+    api.post<{ saved: boolean }>(`/posts/${postId}/bookmark`),
+
+  /** Kiểm tra đã lưu chưa */
+  isBookmarked: (postId: number) =>
+    api.get<{ saved: boolean }>(`/posts/${postId}/bookmarked`),
+
+  /** Lấy danh sách bài đã lưu */
+  getMyBookmarks: (page = 1) =>
+    api.get<{ items: any[]; total: number }>('/posts/activity/my-bookmarks', { params: { page } }),
 };

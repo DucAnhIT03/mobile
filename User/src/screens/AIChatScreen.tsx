@@ -6,6 +6,7 @@ import {
 import { ChevronLeft, Send, Sparkles, Lightbulb, Code, Pencil, Globe, RotateCcw } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { aiApi, AiChatMessage } from '../api/aiApi';
 
 type Message = {
   id: string;
@@ -20,35 +21,6 @@ const SUGGESTIONS = [
   { icon: Pencil, label: 'Viết nội dung', prompt: 'Viết cho tôi một bài thơ về mùa xuân' },
   { icon: Globe, label: 'Dịch ngôn ngữ', prompt: 'Dịch câu "Hello, how are you?" sang tiếng Việt' },
 ];
-
-const AI_RESPONSES: Record<string, string> = {
-  'xin chào': 'Xin chào! 👋 Tôi là AI Assistant. Tôi có thể giúp bạn trả lời câu hỏi, viết nội dung, giải thích khái niệm và nhiều hơn nữa. Hãy hỏi tôi bất cứ điều gì!',
-  'bạn là ai': 'Tôi là AI Assistant - trợ lý thông minh được tích hợp vào ứng dụng. Tôi có thể giúp bạn:\n\n• Trả lời câu hỏi\n• Viết nội dung sáng tạo\n• Giải thích các khái niệm\n• Hỗ trợ học tập\n• Và nhiều hơn nữa! 🚀',
-  'giải thích cho tôi về trí tuệ nhân tạo': 'Trí tuệ nhân tạo (AI) là lĩnh vực khoa học máy tính tập trung vào việc tạo ra các hệ thống có khả năng thực hiện các nhiệm vụ đòi hỏi trí thông minh của con người.\n\n🧠 **Các loại AI:**\n• AI hẹp (Narrow AI): Chuyên về một nhiệm vụ cụ thể\n• AI tổng quát (AGI): Có thể thực hiện mọi nhiệm vụ trí tuệ\n• Siêu AI (ASI): Vượt trội hơn trí tuệ con người\n\n📌 **Ứng dụng phổ biến:**\n• Nhận dạng giọng nói & hình ảnh\n• Chatbot & trợ lý ảo\n• Xe tự lái\n• Y tế & chẩn đoán',
-  'viết cho tôi một hàm sắp xếp mảng bằng javascript': '```javascript\n// Bubble Sort\nfunction bubbleSort(arr) {\n  const n = arr.length;\n  for (let i = 0; i < n - 1; i++) {\n    for (let j = 0; j < n - i - 1; j++) {\n      if (arr[j] > arr[j + 1]) {\n        [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];\n      }\n    }\n  }\n  return arr;\n}\n\n// Sử dụng\nconsole.log(bubbleSort([64, 34, 25, 12, 22, 11, 90]));\n// Output: [11, 12, 22, 25, 34, 64, 90]\n```\n\n💡 Đây là thuật toán Bubble Sort - đơn giản nhưng hiệu quả cho mảng nhỏ!',
-  'viết cho tôi một bài thơ về mùa xuân': '🌸 **Mùa Xuân Về**\n\nXuân về hoa nở rộ khắp nơi,\nGió nhẹ đưa hương thoảng ngát trời.\nChim hót líu lo trên cành biếc,\nNắng vàng rải nhẹ khắp muôn nơi.\n\nĐường phố rộn ràng người qua lại,\nTrẻ thơ nô đùa dưới ánh mai.\nXuân sang mang đến bao hy vọng,\nMột năm mới đẹp, một ngày dài. 🌿',
-  'dịch câu "hello, how are you?" sang tiếng việt': '"Hello, how are you?" dịch sang tiếng Việt là:\n\n🇻🇳 **"Xin chào, bạn có khỏe không?"**\n\nMột số cách nói khác:\n• "Chào bạn, bạn khỏe không?"\n• "Hey, dạo này thế nào?"\n• "Chào, bạn có ổn không?"',
-};
-
-const DEFAULT_RESPONSES = [
-  'Đó là một câu hỏi thú vị! 🤔 Hãy để tôi giải thích cho bạn...\n\nTôi là AI assistant và tôi sẵn sàng hỗ trợ bạn với nhiều chủ đề khác nhau. Bạn có thể hỏi tôi về kiến thức, nhờ viết nội dung, hoặc thảo luận về bất kỳ chủ đề nào!',
-  'Cảm ơn bạn đã hỏi! 😊\n\nTôi có thể giúp bạn với nhiều thứ:\n• Trả lời câu hỏi kiến thức\n• Viết và chỉnh sửa văn bản\n• Gợi ý ý tưởng sáng tạo\n• Giải thích các khái niệm phức tạp\n\nHãy thử hỏi tôi điều gì đó cụ thể hơn nhé!',
-  'Tuyệt vời! 🌟 Tôi rất vui được giúp đỡ bạn.\n\nĐể tôi có thể hỗ trợ tốt hơn, bạn có thể mô tả chi tiết hơn về điều bạn muốn biết không? Tôi sẵn sàng trợ giúp bạn bất cứ lúc nào!',
-  'Hmm, để tôi suy nghĩ về điều này... 💭\n\nĐây là một chủ đề thú vị! Tôi khuyên bạn nên tìm hiểu thêm và đặt những câu hỏi cụ thể hơn để tôi có thể cung cấp thông tin chính xác nhất cho bạn.',
-];
-
-function getAIResponse(userMessage: string): string {
-  const lower = userMessage.toLowerCase().trim();
-  if (AI_RESPONSES[lower]) return AI_RESPONSES[lower];
-
-  // Keyword matching
-  if (lower.includes('chào') || lower.includes('hello') || lower.includes('hi'))
-    return AI_RESPONSES['xin chào'];
-  if (lower.includes('bạn là ai') || lower.includes('ai là gì'))
-    return AI_RESPONSES['bạn là ai'];
-
-  return DEFAULT_RESPONSES[Math.floor(Math.random() * DEFAULT_RESPONSES.length)];
-}
 
 function TypingIndicator() {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -113,27 +85,40 @@ export default function AIChatScreen({ navigation }: any) {
     return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
   };
 
-  const sendMessage = (text?: string) => {
+  const sendMessage = async (text?: string) => {
     const msg = (text || message).trim();
-    if (!msg) return;
+    if (!msg || isTyping) return;
 
     const userMsg: Message = { id: Date.now().toString(), text: msg, isUser: true, timestamp: getNow() };
-    setMessages(prev => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setMessage('');
     scrollToBottom();
-
-    // Simulate AI typing
     setIsTyping(true);
-    scrollToBottom();
 
-    const delay = 1000 + Math.random() * 1500;
-    setTimeout(() => {
-      const reply = getAIResponse(msg);
+    try {
+      // Build conversation history for AI context
+      const history: AiChatMessage[] = updatedMessages.map(m => ({
+        role: m.isUser ? 'user' : 'model',
+        text: m.text,
+      }));
+
+      const res = await aiApi.chat(history);
+      const reply = res.data.reply || 'Xin lỗi, tôi không thể trả lời lúc này.';
       const aiMsg: Message = { id: (Date.now() + 1).toString(), text: reply, isUser: false, timestamp: getNow() };
-      setIsTyping(false);
       setMessages(prev => [...prev, aiMsg]);
+    } catch {
+      const errMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        text: 'Không thể kết nối AI. Vui lòng kiểm tra kết nối mạng và thử lại! 🔄',
+        isUser: false,
+        timestamp: getNow(),
+      };
+      setMessages(prev => [...prev, errMsg]);
+    } finally {
+      setIsTyping(false);
       scrollToBottom();
-    }, delay);
+    }
   };
 
   const handleSuggestion = (prompt: string) => {
@@ -148,7 +133,7 @@ export default function AIChatScreen({ navigation }: any) {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
       {/* Header */}

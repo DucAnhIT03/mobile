@@ -1,26 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList, Modal } from 'react-native';
-import { X } from 'lucide-react-native';
-
-interface Notification {
-  id: number;
-  type: 'follow' | 'like' | 'comment' | 'suggestion';
-  user: string;
-  userImage: string;
-  time?: string;
-  content?: string;
-  postImage?: string;
-  subtitle?: string;
-  isFollowing?: boolean;
-}
-
-const initialNotifications: Notification[] = [
-  { id: 1, type: 'follow', user: 'jane_doe', userImage: 'https://i.pravatar.cc/150?img=1', time: '2h', isFollowing: false },
-  { id: 2, type: 'like', user: 'mike.travels', userImage: 'https://i.pravatar.cc/150?img=47', time: '3h', postImage: 'https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?q=80&w=100' },
-  { id: 3, type: 'comment', user: 'sarah.j', userImage: 'https://i.pravatar.cc/150?img=32', time: '5h', content: 'This is amazing! 🔥', postImage: 'https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?q=80&w=100' },
-  { id: 4, type: 'suggestion', user: 'photography_daily', userImage: 'https://i.pravatar.cc/150?img=15', subtitle: 'Suggested for you', isFollowing: false },
-  { id: 5, type: 'suggestion', user: 'travel_vibes', userImage: 'https://i.pravatar.cc/150?img=20', subtitle: 'Followed by sarah.j', isFollowing: false },
-];
+import React, { useState, useEffect } from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList, Modal, ActivityIndicator } from 'react-native';
+import { X, Check } from 'lucide-react-native';
+import { notificationApi, NotificationItem } from '../api/notificationApi';
+import { BASE_URL } from '../services/api';
 
 interface NotificationsModalProps {
   isOpen: boolean;
@@ -28,14 +10,77 @@ interface NotificationsModalProps {
 }
 
 export function NotificationsModal({ isOpen, onClose }: NotificationsModalProps) {
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const toggleFollow = (id: number) => {
-    setNotifications(notifications.map(n => n.id === id ? { ...n, isFollowing: !n.isFollowing } : n));
+  const resolveUri = (uri: string) => {
+    if (!uri) return 'https://i.pravatar.cc/150';
+    return uri.startsWith('http') ? uri : `${BASE_URL}${uri}`;
   };
 
-  const todayItems = notifications.filter(n => n.type !== 'suggestion');
-  const suggestionItems = notifications.filter(n => n.type === 'suggestion');
+  const loadNotifications = async () => {
+    try {
+      const res = await notificationApi.getNotifications();
+      setNotifications(res.data.items || []);
+      setUnreadCount(res.data.unreadCount || 0);
+    } catch {} finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      setLoading(true);
+      loadNotifications();
+    }
+  }, [isOpen]);
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationApi.markAllAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+    } catch {}
+  };
+
+  const formatTime = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Vừa xong';
+    if (mins < 60) return `${mins}p`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d`;
+    return `${Math.floor(days / 7)}w`;
+  };
+
+  const getNotifMessage = (n: NotificationItem) => {
+    switch (n.type) {
+      case 'follow': return 'đã theo dõi bạn.';
+      case 'like': return 'đã thích bài viết của bạn.';
+      case 'comment': return `đã bình luận: ${n.content || ''}`;
+      case 'mention': return `đã nhắc đến bạn: ${n.content || ''}`;
+      case 'system': return n.content || 'Thông báo hệ thống';
+      default: return '';
+    }
+  };
+
+  const renderNotification = ({ item }: { item: NotificationItem }) => (
+    <View style={[styles.notifRow, !item.isRead && styles.unreadRow]}>
+      <Image
+        source={{ uri: item.actor?.avatar ? resolveUri(item.actor.avatar) : 'https://i.pravatar.cc/150' }}
+        style={styles.avatar}
+      />
+      <View style={styles.notifContent}>
+        <Text style={styles.notifText} numberOfLines={2}>
+          <Text style={styles.notifUser}>{item.actor?.displayName || item.actor?.username || 'Hệ thống'} </Text>
+          <Text style={styles.notifBody}>{getNotifMessage(item)}</Text>
+        </Text>
+        <Text style={styles.notifTime}>{formatTime(item.createdAt)}</Text>
+      </View>
+      {!item.isRead && <View style={styles.unreadDot} />}
+    </View>
+  );
 
   return (
     <Modal visible={isOpen} animationType="slide" transparent onRequestClose={onClose}>
@@ -44,51 +89,32 @@ export function NotificationsModal({ isOpen, onClose }: NotificationsModalProps)
         <View style={styles.modalContainer}>
           <View style={styles.header}>
             <View style={{ width: 24 }} />
-            <Text style={styles.headerTitle}>Notifications</Text>
+            <Text style={styles.headerTitle}>Thông báo</Text>
             <TouchableOpacity onPress={onClose}><X size={24} color="#fff" /></TouchableOpacity>
           </View>
 
-          <FlatList
-            data={[{ type: 'section', key: 'today' }, ...todayItems.map(i => ({ ...i, key: `t-${i.id}` })), { type: 'section', key: 'suggestions' }, ...suggestionItems.map(i => ({ ...i, key: `s-${i.id}` }))]}
-            keyExtractor={(item: any) => item.key || item.id?.toString()}
-            contentContainerStyle={{ paddingBottom: 40 }}
-            renderItem={({ item }: any) => {
-              if (item.type === 'section') {
-                return (
-                  <View style={item.key === 'suggestions' ? styles.sectionHeaderSuggestion : styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>{item.key === 'today' ? 'Today' : 'Suggested for you'}</Text>
-                  </View>
-                );
-              }
-              const n = item as Notification;
-              return (
-                <View style={styles.notifRow}>
-                  <Image source={{ uri: n.userImage }} style={styles.avatar} />
-                  <View style={styles.notifContent}>
-                    <Text style={styles.notifText} numberOfLines={2}>
-                      <Text style={styles.notifUser}>{n.user} </Text>
-                      {n.type === 'follow' && <Text style={styles.notifBody}>started following you.</Text>}
-                      {n.type === 'like' && <Text style={styles.notifBody}>liked your post.</Text>}
-                      {n.type === 'comment' && <Text style={styles.notifBody}>commented: {n.content}</Text>}
-                      {n.type === 'suggestion' && ''}
-                      {n.time && <Text style={styles.notifTime}> {n.time}</Text>}
-                    </Text>
-                    {n.type === 'suggestion' && <Text style={styles.subtitleText}>{n.subtitle}</Text>}
-                  </View>
-                  {(n.type === 'follow' || n.type === 'suggestion') ? (
-                    <TouchableOpacity
-                      style={[styles.followBtn, n.isFollowing && styles.followingBtn]}
-                      onPress={() => toggleFollow(n.id)}
-                    >
-                      <Text style={styles.followBtnText}>{n.isFollowing ? 'Following' : 'Follow'}</Text>
-                    </TouchableOpacity>
-                  ) : n.postImage ? (
-                    <Image source={{ uri: n.postImage }} style={styles.postThumb} />
-                  ) : null}
-                </View>
-              );
-            }}
-          />
+          {unreadCount > 0 && (
+            <TouchableOpacity style={styles.markAllBtn} onPress={handleMarkAllRead}>
+              <Check size={16} color="#3b82f6" />
+              <Text style={styles.markAllText}>Đánh dấu tất cả đã đọc ({unreadCount})</Text>
+            </TouchableOpacity>
+          )}
+
+          {loading ? (
+            <View style={styles.center}><ActivityIndicator size="large" color="#3b82f6" /></View>
+          ) : notifications.length === 0 ? (
+            <View style={styles.center}>
+              <Text style={styles.emptyText}>Chưa có thông báo nào</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={notifications}
+              keyExtractor={item => item.id.toString()}
+              renderItem={renderNotification}
+              contentContainerStyle={{ paddingBottom: 40 }}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
         </View>
       </View>
     </Modal>
@@ -99,21 +125,26 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
   modalContainer: { height: '85%', backgroundColor: '#1A1A1A', borderTopLeftRadius: 16, borderTopRightRadius: 16 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#374151' },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#2A2A2A',
+  },
   headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
-  sectionHeader: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 },
-  sectionHeaderSuggestion: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#374151' },
-  sectionTitle: { fontSize: 14, fontWeight: '600', color: '#fff' },
-  notifRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 8 },
-  avatar: { width: 44, height: 44, borderRadius: 22 },
+  markAllBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 16, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: '#2A2A2A',
+  },
+  markAllText: { fontSize: 13, color: '#3b82f6', fontWeight: '600' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { fontSize: 15, color: '#6b7280' },
+  notifRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
+  unreadRow: { backgroundColor: 'rgba(59,130,246,0.08)' },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#2A2A2A' },
   notifContent: { flex: 1 },
-  notifText: { fontSize: 13 },
+  notifText: { fontSize: 13, lineHeight: 18 },
   notifUser: { fontWeight: '700', color: '#fff' },
   notifBody: { color: '#d1d5db' },
-  notifTime: { color: '#6b7280' },
-  subtitleText: { fontSize: 13, color: '#6b7280', marginTop: 2 },
-  followBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8, backgroundColor: '#3b82f6' },
-  followingBtn: { backgroundColor: '#363636' },
-  followBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  postThumb: { width: 44, height: 44, borderRadius: 6 },
+  notifTime: { fontSize: 12, color: '#6b7280', marginTop: 3 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3b82f6' },
 });

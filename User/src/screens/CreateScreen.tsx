@@ -165,7 +165,10 @@ export default function CreateScreen({ navigation }: any) {
   // === STEP 2: Caption ===
   if (step === 'caption') {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <KeyboardAvoidingView
+        style={[styles.container, { paddingTop: insets.top }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setStep('select')} style={styles.closeBtn}>
             <ChevronLeft size={28} color="#fff" />
@@ -178,7 +181,7 @@ export default function CreateScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.captionContent} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.captionContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.captionRow}>
             <View style={styles.captionThumbWrap}>
               <Image source={{ uri: previewMedia }} style={styles.captionThumb} />
@@ -227,7 +230,7 @@ export default function CreateScreen({ navigation }: any) {
             <Text style={styles.loadingText}>Đang tải lên...</Text>
           </View>
         )}
-      </View>
+      </KeyboardAvoidingView>
     );
   }
 

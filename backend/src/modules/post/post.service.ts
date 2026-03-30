@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Post } from './post.entity';
 import { Like } from './like.entity';
 import { Comment } from './comment.entity';
+import { Bookmark } from './bookmark.entity';
 import { RecommendationService } from '../recommendation/recommendation.service';
 
 @Injectable()
@@ -15,7 +16,10 @@ export class PostService {
     private readonly likeRepo: Repository<Like>,
     @InjectRepository(Comment)
     private readonly commentRepo: Repository<Comment>,
+    @InjectRepository(Bookmark)
+    private readonly bookmarkRepo: Repository<Bookmark>,
   ) {}
+
 
   async create(userId: number, data: { caption: string; type: 'image' | 'video'; media: string[]; thumbnail?: string }): Promise<Post> {
     const tags = RecommendationService.extractTags(data.caption);
@@ -211,6 +215,38 @@ export class PostService {
       };
     });
 
+    return { items, total };
+  }
+
+  // =================== BOOKMARKS ===================
+
+  async toggleBookmark(userId: number, postId: number): Promise<{ saved: boolean }> {
+    const existing = await this.bookmarkRepo.findOne({ where: { userId, postId } });
+    if (existing) {
+      await this.bookmarkRepo.delete(existing.id);
+      return { saved: false };
+    }
+    await this.bookmarkRepo.save(this.bookmarkRepo.create({ userId, postId }));
+    return { saved: true };
+  }
+
+  async isBookmarked(userId: number, postId: number): Promise<boolean> {
+    const count = await this.bookmarkRepo.count({ where: { userId, postId } });
+    return count > 0;
+  }
+
+  async getUserBookmarks(userId: number, page = 1, limit = 30): Promise<{ items: any[]; total: number }> {
+    const [bookmarks, total] = await this.bookmarkRepo.findAndCount({
+      where: { userId },
+      relations: ['post', 'post.user'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    const items = bookmarks.map(b => {
+      if (b.post?.user) delete (b.post.user as any).passwordHash;
+      return { bookmarkId: b.id, savedAt: b.createdAt, post: b.post };
+    });
     return { items, total };
   }
 }

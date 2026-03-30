@@ -8,6 +8,8 @@ import { PostModule } from './modules/post/post.module';
 import { CloudinaryModule } from './modules/cloudinary/cloudinary.module';
 import { RecommendationModule } from './modules/recommendation/recommendation.module';
 import { StoryModule } from './modules/story/story.module';
+import { NotificationModule } from './modules/notification/notification.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { StoryModule } from './modules/story/story.module';
     CloudinaryModule,
     RecommendationModule,
     StoryModule,
+    NotificationModule,
+    AiModule,
   ],
 })
 export class AppModule {}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { User, Mail, Lock, ArrowUpRight, ArrowLeft } from 'lucide-react-native';
+import { User, Mail, Lock, ArrowUpRight, ArrowLeft, Eye, EyeOff } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { authApi } from '../api';
@@ -12,6 +12,7 @@ export default function SignUpScreen({ navigation }: any) {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSignUp = async () => {
@@ -84,13 +85,19 @@ export default function SignUpScreen({ navigation }: any) {
             <View style={styles.inputWrapper}>
               <View style={styles.inputIcon}><Lock size={20} color="rgba(255,255,255,0.7)" /></View>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { paddingRight: 48 }]}
                 placeholder="Password"
                 placeholderTextColor="rgba(255,255,255,0.7)"
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 value={password}
                 onChangeText={setPassword}
               />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff size={20} color="rgba(255,255,255,0.7)" /> : <Eye size={20} color="rgba(255,255,255,0.7)" />}
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity style={styles.submitBtn} onPress={handleSignUp} activeOpacity={0.8} disabled={loading}>
@@ -157,4 +164,5 @@ const styles = StyleSheet.create({
   loginRow: { flexDirection: 'row', marginTop: 32 },
   loginText: { color: 'rgba(255,255,255,0.9)', fontSize: 15 },
   loginLink: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  eyeBtn: { position: 'absolute', right: 16, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: 8 },
 });

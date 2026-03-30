@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList, Dimensions, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList, Dimensions, RefreshControl, ActivityIndicator, Share } from 'react-native';
 import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Plus, Bell, Play, Volume2, VolumeX } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
@@ -11,6 +11,8 @@ import { storyApi, StoryUser } from '../api/storyApi';
 import { BASE_URL } from '../services/api';
 import VideoPlayerItem from '../components/VideoPlayerItem';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { chatApi } from '../api/chatApi';
+import { notificationApi } from '../api/notificationApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -41,6 +43,8 @@ export default function FeedScreen({ navigation }: any) {
   const [visiblePostIds, setVisiblePostIds] = useState<number[]>([]);
   const [storyCircles, setStoryCircles] = useState<StoryCircle[]>([]);
   const [currentUserAvatar, setCurrentUserAvatar] = useState('https://i.pravatar.cc/150');
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   // Watch time tracking per video post
   const videoWatchStart = useRef<Record<number, number>>({});
@@ -176,6 +180,17 @@ export default function FeedScreen({ navigation }: any) {
     useCallback(() => {
       loadFeed();
       loadStories();
+      // Load unread message count
+      chatApi.getConversations()
+        .then(res => {
+          const total = (res.data || []).reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+          setUnreadMessages(total);
+        })
+        .catch(() => {});
+      // Load unread notification count
+      notificationApi.getUnreadCount()
+        .then(res => setUnreadNotifs(res.data.count || 0))
+        .catch(() => {});
     }, [])
   );
 
@@ -220,8 +235,30 @@ export default function FeedScreen({ navigation }: any) {
     }
   };
 
-  const toggleSave = (postId: number) => {
+  const toggleSave = async (postId: number) => {
+    // Optimistic update
     setPosts(posts.map(post => post.id === postId ? { ...post, isSaved: !post.isSaved } : post));
+    try {
+      const res = await postApi.toggleBookmark(postId);
+      setPosts(prev => prev.map(post => post.id === postId ? { ...post, isSaved: res.data.saved } : post));
+    } catch {
+      // Revert
+      setPosts(prev => prev.map(post => post.id === postId ? { ...post, isSaved: !post.isSaved } : post));
+    }
+  };
+
+  const handleShare = async (post: FeedPost) => {
+    try {
+      const userName = post.user?.displayName || post.user?.username || 'User';
+      await Share.share({
+        message: `${userName}: ${post.caption || ''} - Xem trên ConnectDucAnh`,
+        title: 'Chia sẻ bài viết',
+      });
+      // Track share interaction
+      if (post.type === 'video') {
+        postApi.trackInteraction({ postId: post.id, action: 'share' }).catch(() => {});
+      }
+    } catch {}
   };
 
   const formatDate = (dateStr: string) => {
@@ -321,7 +358,7 @@ export default function FeedScreen({ navigation }: any) {
             <TouchableOpacity onPress={() => setActiveCommentPostId(post.id)}>
               <MessageCircle size={24} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity><Send size={24} color="#fff" /></TouchableOpacity>
+            <TouchableOpacity onPress={() => handleShare(post)}><Send size={24} color="#fff" /></TouchableOpacity>
           </View>
           <TouchableOpacity onPress={() => toggleSave(post.id)}>
             <Bookmark size={24} color="#fff" fill={post.isSaved ? '#fff' : 'none'} />
@@ -352,11 +389,15 @@ export default function FeedScreen({ navigation }: any) {
         <View style={styles.headerIcons}>
           <TouchableOpacity onPress={() => setIsNotificationsOpen(true)} style={styles.iconBtn}>
             <Bell size={24} color="#fff" />
-            <View style={styles.badge}><Text style={styles.badgeText}>5</Text></View>
+            {unreadNotifs > 0 && (
+              <View style={styles.badge}><Text style={styles.badgeText}>{unreadNotifs > 99 ? '99+' : unreadNotifs}</Text></View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('ChatList')} style={styles.iconBtn}>
             <MessageCircle size={24} color="#fff" />
-            <View style={styles.badge}><Text style={styles.badgeText}>3</Text></View>
+            {unreadMessages > 0 && (
+              <View style={styles.badge}><Text style={styles.badgeText}>{unreadMessages > 99 ? '99+' : unreadMessages}</Text></View>
+            )}
           </TouchableOpacity>
         </View>
       </View>

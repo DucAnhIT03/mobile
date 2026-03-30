@@ -4,7 +4,7 @@ import {
   KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Lock, Smartphone, ArrowUpRight } from 'lucide-react-native';
+import { Lock, Smartphone, ArrowUpRight, Eye, EyeOff } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { authApi } from '../api';
@@ -16,6 +16,7 @@ export default function LoginScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { setAuth } = useAuth();
   const passwordRef = useRef<TextInput>(null);
@@ -97,15 +98,21 @@ export default function LoginScreen({ navigation }: any) {
             </View>
             <TextInput
               ref={passwordRef}
-              style={[styles.input, { paddingRight: 80 }]}
+              style={[styles.input, { paddingRight: 110 }]}
               placeholder="Password"
               placeholderTextColor="rgba(255,255,255,0.7)"
-              secureTextEntry
+              secureTextEntry={!showPassword}
               value={password}
               onChangeText={setPassword}
               returnKeyType="go"
               onSubmitEditing={handleLogin}
             />
+            <TouchableOpacity
+              style={styles.eyeBtn}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <EyeOff size={20} color="rgba(255,255,255,0.7)" /> : <Eye size={20} color="rgba(255,255,255,0.7)" />}
+            </TouchableOpacity>
             <TouchableOpacity style={styles.forgotBtn} onPress={() => navigation.navigate('ForgotPassword')}>
               <Text style={styles.forgotText}>Forgot?</Text>
             </TouchableOpacity>
@@ -179,8 +186,9 @@ const styles = StyleSheet.create({
   inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', borderRadius: 999, overflow: 'hidden' },
   inputIcon: { paddingLeft: 16, paddingRight: 8 },
   input: { flex: 1, paddingVertical: 16, paddingRight: 16, color: '#fff', fontSize: 16 },
-  forgotBtn: { position: 'absolute', right: 24, top: 0, bottom: 0, justifyContent: 'center' },
+  forgotBtn: { position: 'absolute', right: 16, top: 0, bottom: 0, justifyContent: 'center' },
   forgotText: { color: 'rgba(255,255,255,0.9)', fontWeight: '600', fontSize: 14 },
+  eyeBtn: { position: 'absolute', right: 70, top: 0, bottom: 0, justifyContent: 'center', paddingHorizontal: 8 },
   loginBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderRadius: 999, paddingVertical: 16, marginTop: 8, gap: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 15, elevation: 5 },
   loginBtnText: { fontSize: 18, fontWeight: 'bold', color: '#7e22ce' },
   divider: { flexDirection: 'row', alignItems: 'center', marginTop: 40, width: '100%' },

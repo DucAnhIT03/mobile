@@ -168,4 +168,25 @@ export class PostController {
   async getMyComments(@Req() req: any, @Query('page') page: string) {
     return this.postService.getUserComments(req.user.userId, parseInt(page) || 1);
   }
+
+  // =================== BOOKMARKS ===================
+
+  /** Toggle lưu bài viết */
+  @HttpPost(':id/bookmark')
+  async toggleBookmark(@Param('id') id: string, @Req() req: any) {
+    return this.postService.toggleBookmark(req.user.userId, +id);
+  }
+
+  /** Kiểm tra đã lưu chưa */
+  @Get(':id/bookmarked')
+  async isBookmarked(@Param('id') id: string, @Req() req: any) {
+    const saved = await this.postService.isBookmarked(req.user.userId, +id);
+    return { saved };
+  }
+
+  /** Lấy danh sách bài đã lưu */
+  @Get('activity/my-bookmarks')
+  async getMyBookmarks(@Req() req: any, @Query('page') page: string) {
+    return this.postService.getUserBookmarks(req.user.userId, parseInt(page) || 1);
+  }
 }

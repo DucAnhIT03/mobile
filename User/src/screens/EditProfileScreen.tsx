@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, Image, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { ChevronLeft, Camera, ImageIcon, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -110,7 +110,10 @@ export default function EditProfileScreen({ navigation }: any) {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}><ChevronLeft size={24} color="#fff" /></TouchableOpacity>
@@ -196,7 +199,7 @@ export default function EditProfileScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

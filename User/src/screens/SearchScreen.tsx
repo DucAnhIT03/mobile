@@ -1,35 +1,156 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Image, Dimensions, ScrollView, RefreshControl } from 'react-native';
-import { Search as SearchIcon, Mic, X, Play } from 'lucide-react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList, Image,
+  Dimensions, ScrollView, RefreshControl, ActivityIndicator, Share,
+} from 'react-native';
+import { Search as SearchIcon, X, Play, MessageSquare } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Rect, Circle, Polyline } from 'react-native-svg';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { postApi, PostItem } from '../api/postApi';
+import { userApi, UserInfo } from '../api/userApi';
+import { BASE_URL } from '../services/api';
+import VideoThumbnailItem from '../components/VideoThumbnailItem';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const GRID_GAP = 2;
-const ITEM_WIDTH = (SCREEN_WIDTH - GRID_GAP) / 2;
+const ITEM_WIDTH = (SCREEN_WIDTH - 4) / 3;
 
-const categories = ['For You', 'Trending', 'Music', 'Comedy', 'Gaming', 'Food', 'Dance', 'Beauty', 'Sports'];
-
-const exploreItems = [
-  { id: 1, type: 'video', url: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop', views: '1.2M' },
-  { id: 2, type: 'image', url: 'https://images.unsplash.com/photo-1516280440502-62b210214eb7?q=80&w=1000&auto=format&fit=crop', views: '890K' },
-  { id: 3, type: 'video', url: 'https://images.unsplash.com/photo-1574169208507-84376144848b?q=80&w=1000&auto=format&fit=crop', views: '2.4M' },
-  { id: 4, type: 'image', url: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000&auto=format&fit=crop', views: '500K' },
-  { id: 5, type: 'video', url: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1000&auto=format&fit=crop', views: '3.1M' },
-  { id: 6, type: 'image', url: 'https://images.unsplash.com/photo-1504609774734-ee3874f6ce4a?q=80&w=1000&auto=format&fit=crop', views: '120K' },
-  { id: 7, type: 'video', url: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=1000&auto=format&fit=crop', views: '4.5M' },
-  { id: 8, type: 'image', url: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1000&auto=format&fit=crop', views: '670K' },
-  { id: 9, type: 'video', url: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?q=80&w=1000&auto=format&fit=crop', views: '900K' },
-  { id: 10, type: 'image', url: 'https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=1000&auto=format&fit=crop', views: '2.1M' },
-  { id: 11, type: 'video', url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=1000&auto=format&fit=crop', views: '3.3M' },
-  { id: 12, type: 'image', url: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=1000&auto=format&fit=crop', views: '1.1M' },
+type SearchTab = 'top' | 'video' | 'users' | 'images';
+const SEARCH_TABS: { key: SearchTab | 'ask'; label: string }[] = [
+  { key: 'ask', label: 'Hỏi' },
+  { key: 'top', label: 'Top' },
+  { key: 'video', label: 'Video' },
+  { key: 'users', label: 'Người dùng' },
+  { key: 'images', label: 'Ảnh' },
 ];
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const [query, setQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('For You');
+  const [activeTab, setActiveTab] = useState<SearchTab>('top');
+  const [allPosts, setAllPosts] = useState<PostItem[]>([]);
+  const [searchPosts, setSearchPosts] = useState<PostItem[]>([]);
+  const [users, setUsers] = useState<UserInfo[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [searching, setSearching] = useState(false);
+
+  const resolveUri = (uri: string) => {
+    if (!uri) return 'https://i.pravatar.cc/150';
+    return uri.startsWith('http') ? uri : `${BASE_URL}${uri}`;
+  };
+
+  const loadExplore = async () => {
+    try {
+      const res = await postApi.getFeed();
+      setAllPosts(res.data.posts || []);
+    } catch {} finally { setLoading(false); }
+  };
+
+  useFocusEffect(useCallback(() => { loadExplore(); }, []));
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadExplore();
+    setRefreshing(false);
+  };
+
+  // Debounce search
+  useEffect(() => {
+    if (!query.trim()) {
+      setUsers([]);
+      setSearchPosts([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const timeout = setTimeout(async () => {
+      try {
+        const [userRes] = await Promise.all([
+          userApi.search(query.trim()),
+        ]);
+        setUsers(userRes.data || []);
+        // Filter posts by caption
+        const q = query.trim().toLowerCase();
+        const filtered = allPosts.filter(p =>
+          p.caption?.toLowerCase().includes(q) ||
+          p.user?.username?.toLowerCase().includes(q) ||
+          p.user?.displayName?.toLowerCase().includes(q)
+        );
+        setSearchPosts(filtered);
+      } catch {}
+      setSearching(false);
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [query, allPosts]);
+
+  const isSearchMode = query.trim().length > 0;
+
+  // Filtered data based on active tab
+  const getFilteredPosts = () => {
+    if (!isSearchMode) return allPosts;
+    switch (activeTab) {
+      case 'video': return searchPosts.filter(p => p.type === 'video');
+      case 'images': return searchPosts.filter(p => p.type === 'image');
+      case 'top': return searchPosts;
+      default: return searchPosts;
+    }
+  };
+
+  const renderExploreItem = ({ item }: { item: PostItem }) => {
+    const isVideo = item.type === 'video';
+    return (
+      <TouchableOpacity
+        style={styles.gridItem}
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('PostDetail', { post: item })}
+      >
+        {isVideo ? (
+          <VideoThumbnailItem
+            videoUri={resolveUri(item.media[0])}
+            thumbnailUri={item.thumbnail ? resolveUri(item.thumbnail) : null}
+            style={styles.gridImage}
+          />
+        ) : (
+          <Image source={{ uri: resolveUri(item.media[0]) }} style={styles.gridImage} />
+        )}
+        {isVideo && (
+          <View style={styles.videoIcon}>
+            <Play size={14} color="#fff" fill="#fff" />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const renderUserItem = ({ item }: { item: UserInfo }) => (
+    <TouchableOpacity
+      style={styles.userItem}
+      activeOpacity={0.7}
+      onPress={() => navigation.navigate('UserProfile', {
+        userId: item.id, username: item.username,
+        avatar: item.avatar, isOnline: item.isOnline,
+      })}
+    >
+      <Image
+        source={{ uri: item.avatar ? resolveUri(item.avatar) : 'https://i.pravatar.cc/150' }}
+        style={styles.userAvatar}
+      />
+      <View style={styles.userInfo}>
+        <Text style={styles.userDisplayName}>{item.displayName || item.username}</Text>
+        <Text style={styles.username}>@{item.username}</Text>
+      </View>
+      {item.isOnline && <View style={styles.onlineDot} />}
+    </TouchableOpacity>
+  );
+
+  const handleTabPress = (key: SearchTab | 'ask') => {
+    if (key === 'ask') {
+      navigation.navigate('AIChat');
+      return;
+    }
+    setActiveTab(key);
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -41,8 +162,9 @@ export default function SearchScreen() {
             style={styles.searchInput}
             value={query}
             onChangeText={setQuery}
-            placeholder="Search..."
+            placeholder="Tìm kiếm..."
             placeholderTextColor="#6b7280"
+            returnKeyType="search"
           />
           {query ? (
             <TouchableOpacity onPress={() => setQuery('')} style={styles.clearBtn}>
@@ -50,81 +172,144 @@ export default function SearchScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-        <TouchableOpacity style={styles.micBtn}>
-          <Mic size={20} color="#fff" />
-        </TouchableOpacity>
       </View>
 
-      {/* Categories */}
-      <View style={styles.categoriesContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-          {categories.map((item) => (
-            <TouchableOpacity
-              key={item}
-              onPress={() => setActiveCategory(item)}
-              style={[styles.categoryBtn, activeCategory === item && styles.categoryBtnActive, { marginRight: 10 }]}
-            >
-              <Text style={[styles.categoryText, activeCategory === item && styles.categoryTextActive]}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+      {/* Search Tabs — chỉ hiện khi đang tìm kiếm */}
+      {isSearchMode && (
+        <View style={styles.tabsContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 0 }}>
+            {SEARCH_TABS.map(tab => (
+              <TouchableOpacity
+                key={tab.key}
+                style={[styles.tabBtn, tab.key !== 'ask' && activeTab === tab.key && styles.tabBtnActive]}
+                onPress={() => handleTabPress(tab.key)}
+              >
+                {tab.key === 'ask' ? (
+                  <View style={styles.askBtn}>
+                    <MessageSquare size={14} color="#3b82f6" />
+                    <Text style={styles.askText}>{tab.label}</Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>{tab.label}</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
-      {/* Grid */}
-      <FlatList
-        data={exploreItems}
-        numColumns={2}
-        showsVerticalScrollIndicator={false}
-        keyExtractor={item => item.id.toString()}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={async () => {
-            setRefreshing(true);
-            await new Promise(r => setTimeout(r, 1000));
-            setRefreshing(false);
-          }} tintColor="#3b82f6" colors={['#3b82f6']} />
-        }
-        columnWrapperStyle={{ justifyContent: 'space-between' }}
-        renderItem={({ item }) => (
-          <View style={styles.gridItem}>
-            <Image source={{ uri: item.url }} style={styles.gridImage} />
-            <View style={styles.gridOverlay} />
-            <View style={styles.gridInfo}>
-              {item.type === 'video' ? (
-                <Play size={14} color="#fff" fill="#fff" />
-              ) : (
-                <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <Rect x={3} y={3} width={18} height={18} rx={2} ry={2} />
-                  <Circle cx={8.5} cy={8.5} r={1.5} />
-                  <Polyline points="21 15 16 10 5 21" />
-                </Svg>
-              )}
-              <Text style={styles.gridViews}>{item.views}</Text>
-            </View>
-          </View>
-        )}
-      />
+      {isSearchMode ? (
+        /* === SEARCH RESULTS === */
+        searching ? (
+          <View style={styles.center}><ActivityIndicator size="large" color="#3b82f6" /></View>
+        ) : activeTab === 'users' ? (
+          <FlatList
+            key="users-list"
+            data={users}
+            keyExtractor={item => item.id.toString()}
+            renderItem={renderUserItem}
+            contentContainerStyle={{ paddingBottom: 80 }}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.center}>
+                <Text style={styles.emptyText}>Không tìm thấy người dùng</Text>
+              </View>
+            }
+          />
+        ) : (
+          <FlatList
+            key="grid-3col"
+            data={getFilteredPosts()}
+            numColumns={3}
+            keyExtractor={item => item.id.toString()}
+            renderItem={renderExploreItem}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 80 }}
+            ListEmptyComponent={
+              <View style={styles.center}>
+                <Text style={styles.emptyText}>Không tìm thấy kết quả</Text>
+              </View>
+            }
+          />
+        )
+      ) : (
+        /* === EXPLORE GRID === */
+        loading ? (
+          <View style={styles.center}><ActivityIndicator size="large" color="#3b82f6" /></View>
+        ) : (
+          <FlatList
+            data={allPosts}
+            numColumns={3}
+            keyExtractor={item => item.id.toString()}
+            renderItem={renderExploreItem}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 80 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" colors={['#3b82f6']} />
+            }
+            ListEmptyComponent={
+              <View style={styles.center}>
+                <SearchIcon size={48} color="#374151" />
+                <Text style={styles.emptyText}>Chưa có bài viết nào</Text>
+              </View>
+            }
+          />
+        )
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  searchHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
-  searchInputWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A1A1A', borderRadius: 999, paddingHorizontal: 16 },
-  searchIconPos: { marginRight: 8 },
+  searchHeader: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  searchInputWrapper: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#1A1A1A', borderRadius: 999, paddingHorizontal: 16,
+  },
   searchInput: { flex: 1, paddingVertical: 12, color: '#fff', fontSize: 16 },
   clearBtn: { padding: 6, backgroundColor: '#374151', borderRadius: 12 },
-  micBtn: { padding: 12, backgroundColor: '#1A1A1A', borderRadius: 999 },
-  categoriesContainer: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
-  categoriesList: { paddingHorizontal: 16, paddingVertical: 12 },
-  categoryBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: '#374151', minHeight: 36, justifyContent: 'center' },
-  categoryBtnActive: { backgroundColor: '#fff', borderColor: '#fff' },
-  categoryText: { fontSize: 14, fontWeight: '500', color: '#9ca3af' },
-  categoryTextActive: { color: '#000' },
-  gridItem: { width: ITEM_WIDTH, aspectRatio: 3 / 4, position: 'relative', overflow: 'hidden', backgroundColor: '#1f2937' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, paddingTop: 60 },
+  emptyText: { fontSize: 15, color: '#6b7280', textAlign: 'center', paddingHorizontal: 24 },
+
+  // Tabs — pill/chip style
+  tabsContainer: {
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 10,
+  },
+  tabBtn: {
+    paddingHorizontal: 16, paddingVertical: 8, marginHorizontal: 4,
+    borderRadius: 20, backgroundColor: '#1A1A1A',
+    borderWidth: 1, borderColor: '#2A2A2A',
+  },
+  tabBtnActive: {
+    backgroundColor: '#fff', borderColor: '#fff',
+  },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#9ca3af' },
+  tabTextActive: { color: '#000' },
+  askBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(99,102,241,0.12)', paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 20, borderWidth: 1, borderColor: 'rgba(99,102,241,0.35)',
+  },
+  askText: { fontSize: 14, fontWeight: '700', color: '#818cf8' },
+
+  // Grid
+  gridItem: { width: ITEM_WIDTH, height: ITEM_WIDTH, padding: 0.5 },
   gridImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  gridOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'transparent' },
-  gridInfo: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center' },
-  gridViews: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  videoIcon: { position: 'absolute', top: 6, right: 6 },
+
+  // User
+  userItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 10,
+  },
+  userAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#2A2A2A' },
+  userInfo: { flex: 1 },
+  userDisplayName: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  username: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#22c55e' },
 });
