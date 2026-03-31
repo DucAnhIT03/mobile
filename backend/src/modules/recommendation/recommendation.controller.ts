@@ -15,7 +15,7 @@ export class RecommendationController {
     @Query('limit') limit: string = '10',
   ) {
     return this.recommendationService.getRecommendedFeed(
-      req.user.sub,
+      req.user.userId,
       parseInt(page) || 1,
       parseInt(limit) || 10,
     );
@@ -32,12 +32,12 @@ export class RecommendationController {
       videoDurationMs?: number;
     },
   ) {
-    return this.recommendationService.trackInteraction(req.user.sub, body);
+    return this.recommendationService.trackInteraction(req.user.userId, body);
   }
 
   /** GET /recommendation/interests — Lấy hồ sơ sở thích user */
   @Get('interests')
   async getUserInterests(@Req() req: any) {
-    return this.recommendationService.getUserEmbedding(req.user.sub);
+    return this.recommendationService.getUserEmbedding(req.user.userId);
   }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList, Dimensions, RefreshControl, ActivityIndicator, Share } from 'react-native';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Plus, Bell, Play, Volume2, VolumeX } from 'lucide-react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, FlatList, Dimensions, RefreshControl, ActivityIndicator, Share, Pressable } from 'react-native';
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Plus, Bell, Volume2, VolumeX } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { CommentsModal } from '../components/CommentsModal';
@@ -10,6 +10,7 @@ import { postApi, PostItem } from '../api/postApi';
 import { storyApi, StoryUser } from '../api/storyApi';
 import { BASE_URL } from '../services/api';
 import VideoPlayerItem from '../components/VideoPlayerItem';
+import VideoThumbnailItem from '../components/VideoThumbnailItem';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { chatApi } from '../api/chatApi';
 import { notificationApi } from '../api/notificationApi';
@@ -28,6 +29,124 @@ interface StoryCircle {
   isUser: boolean;
   hasStory: boolean;
   userId: number;
+}
+
+/** Component riêng cho video post — tách ra để quản lý state progress riêng */
+function FeedVideoPlayer({
+  uri,
+  isFocused,
+  isVisible,
+  isMuted,
+  onMuteToggle,
+  thumbnail,
+}: {
+  uri: string;
+  isFocused: boolean;
+  isVisible: boolean;
+  isMuted: boolean;
+  onMuteToggle: () => void;
+  thumbnail?: string;
+}) {
+  const [showControls, setShowControls] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const controlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTap = () => {
+    setShowControls(prev => {
+      const next = !prev;
+      // Tự ẩn controls sau 4 giây
+      if (controlsTimeout.current) clearTimeout(controlsTimeout.current);
+      if (next) {
+        controlsTimeout.current = setTimeout(() => setShowControls(false), 4000);
+      }
+      return next;
+    });
+  };
+
+  const handleProgress = useCallback((pos: number, dur: number) => {
+    if (dur > 0) {
+      setProgress(pos / dur);
+      setCurrentTime(pos);
+      setDuration(dur);
+    }
+  }, []);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const shouldPlay = isFocused && isVisible;
+
+  // Khi KHÔNG visible → hiện thumbnail tĩnh thay vì player → tiết kiệm RAM
+  if (!isVisible) {
+    return (
+      <View style={{ position: 'relative', backgroundColor: '#000' }}>
+        <VideoThumbnailItem
+          videoUri={uri}
+          thumbnailUri={thumbnail}
+          style={styles.postImage}
+        />
+      </View>
+    );
+  }
+
+  const handleSeek = (evt: any) => {
+    if (duration > 0) {
+      const { locationX } = evt.nativeEvent;
+      const barWidth = SCREEN_WIDTH - 24 - 64; // trừ padding + 2 label
+      const seekRatio = Math.max(0, Math.min(1, locationX / barWidth));
+      setProgress(seekRatio);
+      setCurrentTime(seekRatio * duration);
+    }
+  };
+
+  return (
+    <View style={{ position: 'relative', backgroundColor: '#000' }}>
+      <VideoPlayerItem
+        uri={uri}
+        style={styles.postImage}
+        shouldPlay={shouldPlay}
+        isMuted={isMuted || !isFocused}
+        isLooping={true}
+        contentFit="contain"
+        nativeControls={false}
+        onProgress={handleProgress}
+      />
+
+      {/* Tap chính giữa video để hiện/ẩn controls */}
+      <Pressable
+        style={styles.videoTapZone}
+        onPress={handleTap}
+      />
+
+      {/* Nút mute — luôn hiện, z-index cao nhất */}
+      <TouchableOpacity onPress={onMuteToggle} style={styles.feedMuteBtn}>
+        {isMuted ? <VolumeX size={18} color="#fff" /> : <Volume2 size={18} color="#fff" />}
+      </TouchableOpacity>
+
+      {/* Progress bar + time — có thể chạm để tua */}
+      {showControls && duration > 0 && (
+        <View style={styles.videoControlsOverlay}>
+          <View style={styles.progressContainer}>
+            <Text style={styles.timeLabel}>{formatTime(currentTime)}</Text>
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={handleSeek}
+              style={styles.progressBarBg}
+            >
+              <View style={[styles.progressBarFill, { width: `${Math.min(progress * 100, 100)}%` }]} />
+              <View style={[styles.progressDot, { left: `${Math.min(progress * 100, 100)}%` }]} />
+            </TouchableOpacity>
+            <Text style={styles.timeLabel}>{formatTime(duration)}</Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
 }
 
 
@@ -333,18 +452,14 @@ export default function FeedScreen({ navigation }: any) {
 
         {/* Post Media */}
         {post.type === 'video' ? (
-          <View style={{ position: 'relative', backgroundColor: '#000' }}>
-            <VideoPlayerItem
-              uri={postImage}
-              style={styles.postImage}
-              shouldPlay={isFocused && visiblePostIds.includes(post.id)}
-              isMuted={isMuted || !isFocused || !visiblePostIds.includes(post.id)}
-              isLooping={true}
-              contentFit="contain"
-              nativeControls={false}
-              onMuteToggle={() => setIsMuted(!isMuted)}
-            />
-          </View>
+          <FeedVideoPlayer
+            uri={postImage}
+            isFocused={isFocused}
+            isVisible={visiblePostIds.includes(post.id)}
+            isMuted={isMuted}
+            onMuteToggle={() => setIsMuted(!isMuted)}
+            thumbnail={post.thumbnail || undefined}
+          />
         ) : (
           <Image source={{ uri: postImage }} style={styles.postImage} />
         )}
@@ -426,6 +541,10 @@ export default function FeedScreen({ navigation }: any) {
           contentContainerStyle={{ paddingBottom: 80 }}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
+          windowSize={3}
+          maxToRenderPerBatch={3}
+          removeClippedSubviews={true}
+          initialNumToRender={3}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" colors={['#3b82f6']} />
           }
@@ -490,7 +609,40 @@ const styles = StyleSheet.create({
   captionUser: { fontWeight: '600' },
   commentsLink: { fontSize: 13, color: '#9ca3af', marginTop: 6 },
   timeText: { fontSize: 10, color: '#6b7280', marginTop: 6 },
-  videoPlayOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
-  videoPlayBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  muteBtn: { position: 'absolute', bottom: 12, right: 12, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  // Video controls overlay
+  videoTapZone: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 50,
+  },
+  feedMuteBtn: {
+    position: 'absolute', bottom: 12, right: 12,
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center', alignItems: 'center',
+    zIndex: 10,
+  },
+  videoControlsOverlay: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 12, paddingBottom: 8, paddingTop: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  progressContainer: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  progressBarBg: {
+    flex: 1, height: 20, justifyContent: 'center',
+    position: 'relative',
+  },
+  progressBarFill: {
+    height: 3, backgroundColor: '#fff',
+    borderRadius: 2, position: 'absolute', left: 0, top: 8.5,
+  },
+  progressDot: {
+    position: 'absolute', top: 5, marginLeft: -5,
+    width: 10, height: 10, borderRadius: 5,
+    backgroundColor: '#fff',
+  },
+  timeLabel: {
+    color: '#fff', fontSize: 11, fontWeight: '500',
+    minWidth: 32, textAlign: 'center',
+  },
 });
